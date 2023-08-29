@@ -1,7 +1,7 @@
 from fastapi import FastAPI, status, Depends
 from mall.models import Customer, CreateUpdateCustomer
 from mall.database import get_db, engine
-from sqlmodel import Session, SQLModel
+from sqlmodel import Session, SQLModel, select
 
 app = FastAPI()
 
@@ -11,6 +11,17 @@ app = FastAPI()
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
 
+@app.get("/customers/{id}")
+async def get_by_id(id: int, session: Session = Depends(get_db)):
+    with session:
+        customer_here = session.get(Customer, id)
+        if not customer_here:
+            return f"Customer with id: {id} has not found."
+        return customer_here
+
+@app.get("/customer/{id}")
+async  def get_by_id(id: int, sessions: Session=Depends(get_db)):
+    with sessions
 
 # Create new customer
 @app.post("/customers")
