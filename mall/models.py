@@ -15,3 +15,9 @@ class CreateUpdateCustomer(SQLModel):
     Age: Optional[int]
     AnnualIncome: Optional[float]
     SpendingScore: Optional[int]
+
+
+class ShowCustomer(SQLModel):
+    CustomerID: int
+    Gender: str
+    Age: Optional[int]
