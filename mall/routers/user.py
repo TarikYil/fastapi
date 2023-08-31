@@ -45,6 +45,7 @@ def login(request: Login, session: Session = Depends(get_db)):
         return {'token': token}
 
 
+
 @router.get('/protected')
 def protected(username=Depends(auth_handler.auth_wrapper)):
     return {'name': username}
