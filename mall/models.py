@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
-
+from pydantic import BaseModel
+from datetime import datetime
 
 class Customer(SQLModel, table=True):
     CustomerID: Optional[int] = Field(default=None, primary_key=True)
@@ -64,5 +65,31 @@ class ShowUser(SQLModel):
             "example": {
                 "name": "Mesut KOCAMAN",
                 "email": "mlops1@vbo.local"
+            }
+        }
+
+
+class Advertising(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    TV: float
+    Radio: float
+    Newspaper: float
+    prediction: float
+    prediction_time: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    client_ip: str
+    username: str
+
+
+class AdvertisingInput(SQLModel):
+    TV: float
+    Radio: float
+    Newspaper: float
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "TV": 230.1,
+                "Radio": 37.8,
+                "Newspaper": 69.2,
             }
         }

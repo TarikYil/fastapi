@@ -1,11 +1,15 @@
 from typing import List
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session, select
-from mall.models import Customer, CreateUpdateCustomer, ShowCustomer
+from mall.models import Customer, CreateUpdateCustomer, ShowCustomer, Advertising, AdvertisingInput
 from mall.database import get_db
+import joblib
+from mall.routers.user import auth_handler
 
 
 router = APIRouter()
+
+estimator_rf_model_loaded = joblib.load("mall/saved_models/pipline_model.pkl")
 
 
 # Get customer
@@ -17,16 +21,17 @@ async def get_by_id(id: int, session: Session = Depends(get_db)):
             return f"Customer with id: {id} has not found."
         return customer_here
 
+
 # All customer
 @router.get("/customers", response_model=List[ShowCustomer])
-async def get_customer(session: Session= Depends(get_db)):
+async def get_customer(session: Session = Depends(get_db)):
     with session:
-        customer_all= session.exec(select(Customer)).all()
+        customer_all = session.exec(select(Customer)).all()
         return customer_all
 
 
 # Create new customer
-@router.post("/customers",response_model=ShowCustomer)
+@router.post("/customers", response_model=ShowCustomer)
 async def create_customer(request: CreateUpdateCustomer, session: Session = Depends(get_db)):
     new_customer = Customer(
         Gender=request.Gender,
@@ -40,11 +45,12 @@ async def create_customer(request: CreateUpdateCustomer, session: Session = Depe
         session.refresh(new_customer)
         return new_customer
 
+
 # Delete customer
 @router.delete("/customers/{id}")
-async def delete_customer(id: int, session: Session= Depends(get_db)):
+async def delete_customer(id: int, session: Session = Depends(get_db)):
     with session:
-        customer_new1= session.get(Customer, id)
+        customer_new1 = session.get(Customer, id)
         if not customer_new1:
             return f"Customer {id} fatal error"
         session.delete(customer_new1)
@@ -54,9 +60,9 @@ async def delete_customer(id: int, session: Session= Depends(get_db)):
 
 # Update customer
 @router.put("/customers/{id}")
-async def update_customer(id: int, request: CreateUpdateCustomer, session: Session= Depends(get_db)):
+async def update_customer(id: int, request: CreateUpdateCustomer, session: Session = Depends(get_db)):
     with session:
-        customer_up= session.get(Customer, id)
+        customer_up = session.get(Customer, id)
         if not customer_up:
             return f"Customer {id} fatal error"
         update_data = request.dict(exclude_unset=True)
@@ -66,3 +72,83 @@ async def update_customer(id: int, request: CreateUpdateCustomer, session: Sessi
         session.commit()
         session.refresh(customer_up)
         return customer_up
+
+
+# prediction function
+def make_advertising_prediction(model, request):
+    # parse input from request
+    TV = request["TV"]
+    Radio = request['Radio']
+    Newspaper = request['Newspaper']
+
+    # Make an input vector
+    advertising = [[TV, Radio, Newspaper]]
+
+    # Predict
+    prediction = model.predict(advertising)
+
+    return prediction[0]
+
+
+def insert_advertising(request, prediction, client_ip,username, db):
+    new_advertising = Advertising(
+        TV=request["TV"],
+        Radio=request['Radio'],
+        Newspaper=request['Newspaper'],
+        prediction=prediction,
+        client_ip=client_ip,
+        username=username
+    )
+
+    with db as session:
+        session.add(new_advertising)
+        session.commit()
+        session.refresh(new_advertising)
+
+    return new_advertising
+
+#Predictions create
+@router.post('/protected/advertising_pred')
+async def predict_advertising(request: AdvertisingInput, fastapi_req: Request,
+                              username=Depends(auth_handler.auth_wrapper), db: Session = Depends(get_db)):
+    prediction = make_advertising_prediction(estimator_rf_model_loaded, request.dict())
+    db_insert_record = insert_advertising(request=request.dict(), prediction=prediction,
+                                          client_ip=fastapi_req.client.host,username=username,
+                                          db=db)
+    return {"prediction": prediction, "db_record": db_insert_record, "username": username}
+
+#Username get
+@router.get("/advertising/{username}")
+async def get_by_username(username: str, session: Session = Depends(get_db), auth=Depends(auth_handler.auth_wrapper)):
+    with session:
+        if not auth:
+            return f"not found"
+        customer_here = session.query(Advertising).filter(Advertising.username == username).first()
+        if not customer_here:
+            return f"Customer with username: {username} was not found."
+        return customer_here
+
+#All username
+@router.get("/advertising")
+async def get_customer(session: Session = Depends(get_db),username=Depends(auth_handler.auth_wrapper)):
+    with session:
+        if not username:
+            return f"not found"
+        customer_all = session.exec(select(Advertising)).all()
+        return customer_all
+
+
+# Delete username
+@router.delete("/advertising/{username}")
+async def delete_customer(username: str, session: Session = Depends(get_db), auth=Depends(auth_handler.auth_wrapper)):
+    with session:
+        if not auth:
+            return f"not found"
+        customer_new1 = session.query(Advertising).filter(Advertising.username == username).first()
+        if not customer_new1:
+            return f"Customer {username} fatal error"
+        session.delete(customer_new1)
+        session.commit()
+        return {"delete": True}
+
+
