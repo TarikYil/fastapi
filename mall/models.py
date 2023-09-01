@@ -3,25 +3,6 @@ from typing import Optional
 from pydantic import BaseModel
 from datetime import datetime
 
-class Customer(SQLModel, table=True):
-    CustomerID: Optional[int] = Field(default=None, primary_key=True)
-    Gender: str
-    Age: Optional[int] = Field(default=None)
-    AnnualIncome: float
-    SpendingScore: int
-
-
-class CreateUpdateCustomer(SQLModel):
-    Gender: Optional[str]
-    Age: Optional[int]
-    AnnualIncome: Optional[float]
-    SpendingScore: Optional[int]
-
-
-class ShowCustomer(SQLModel):
-    CustomerID: int
-    Gender: str
-    Age: Optional[int]
 
 
 class Login(SQLModel):
